@@ -89,7 +89,6 @@ def card_ui(card_id, card):
         id=card_id
     )
 
-# Define the UI layout
 app_ui = ui.page_fluid(
     ui.h2("52 Playing Cards"),
     ui.div(
@@ -104,7 +103,7 @@ app_ui = ui.page_fluid(
         .cards-container {
             display: grid;
             grid-template-columns: repeat(13, 1fr); /* 13 cards per row */
-            gap: 20px 1px; /* Gap between rows */
+            gap: calc(2vw + 2px) 1px; /* Responsive gap between rows */
             justify-items: center; /* Center cards horizontally */
         }
         .row {
@@ -120,9 +119,28 @@ app_ui = ui.page_fluid(
             height: auto; /* Maintain aspect ratio */
             max-width: calc(100vw / 15);  /* Responsive card width */
         }
-        @media (max-width: 600px) {
+        @media (max-width: 1200px) {
+            .cards-container {
+                gap: calc(1.5vw + 5px) 1px; /* Slightly smaller gap for medium screens */
+            }
             .card-image {
-                max-width: calc(100vw / 12);  /* Larger cards on small screens */
+                max-width: calc(100vw / 14);  /* Slightly larger cards on medium screens */
+            }
+        }
+        @media (max-width: 900px) {
+            .cards-container {
+                gap: calc(1vw + 5px) 1px; /* Even smaller gap for smaller screens */
+            }
+            .card-image {
+                max-width: calc(100vw / 13);  /* Larger cards on smaller screens */
+            }
+        }
+        @media (max-width: 600px) {
+            .cards-container {
+                gap: calc(0.5vw + 5px) 1px; /* Smallest gap for mobile screens */
+            }
+            .card-image {
+                max-width: calc(100vw / 12);  /* Largest cards on mobile screens */
             }
         }
     """)
