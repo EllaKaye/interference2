@@ -91,10 +91,10 @@ def card_ui(card_id, card):
     )
 
 # Helper function to find card position
-def find_card_position(rows, card):
-    for i, row in enumerate(rows):
+def find_card_position(card_positions, card):
+    for i, row in enumerate(card_positions):
         for j, c in enumerate(row):
-            if c.value == card.value and c.suit == card.suit:
+            if c().value == card.value and c().suit == card.suit:
                 return i, j
     return None, None
 
@@ -182,14 +182,15 @@ app_ui = ui.page_fluid(
 
 # Define the server logic
 def server(input, output, session):
-    grid = reactive.Value(rows)
+    # Create a reactive value for each card position
+    card_positions = [[reactive.Value(card) for card in row] for row in rows]
 
     # Create a render function for each card
     def create_card_render(i, j):
         @output(id=f"card_{i*13+j}")
         @render.ui
         def _():
-            return card_ui(f"card_{i*13+j}", grid.get()[i][j])
+            return card_ui(f"card_{i*13+j}", card_positions[i][j]())
 
     # Initialize all card outputs
     for i in range(4):
@@ -208,18 +209,17 @@ def server(input, output, session):
         card1 = Card(card1_str[1], card1_str[0])
         card2 = Card(card2_str[1], card2_str[0])
 
-        current_grid = grid.get()
-        if current_grid.swap_cards(card1, card2):
-            grid.set(current_grid)
+        # Find positions of cards
+        pos1 = find_card_position(card_positions, card1)
+        pos2 = find_card_position(card_positions, card2)
 
-            # Find positions of swapped cards
-            pos1 = find_card_position(current_grid, card1)
-            pos2 = find_card_position(current_grid, card2)
-
-            # Trigger updates for the swapped cards
-            if pos1[0] is not None and pos2[0] is not None:
-                output.invalidate(f"card_{pos1[0]*13+pos1[1]}")
-                output.invalidate(f"card_{pos2[0]*13+pos2[1]}")
+        if pos1[0] is not None and pos2[0] is not None:
+            # Check if the move is valid
+            if card1.suit == card2.suit or card1.value == card2.value:
+                # Swap the cards in the reactive values
+                temp = card_positions[pos1[0]][pos1[1]]()
+                card_positions[pos1[0]][pos1[1]].set(card_positions[pos2[0]][pos2[1]]())
+                card_positions[pos2[0]][pos2[1]].set(temp)
 
 # Create the Shiny app
 app = App(app_ui, server)
