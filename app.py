@@ -2,11 +2,10 @@ from shiny import App, render, ui, reactive
 import random
 
 # Card constants
-CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "0", "J", "Q", "K", "A"]
+CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "0", "J", "Q", "K", "Blank"]
 CARD_SUITS = ["S", "H", "D", "C"]
 VALUES_INT = {value: index for index, value in enumerate(CARD_VALUES)}
 
-# Define the Card class
 class Card:
     def __init__(self, suit, value):
         self.suit = suit
@@ -14,74 +13,56 @@ class Card:
         self.value_int = VALUES_INT[value]
 
     def image_path(self):
+        if self.value == "Blank":
+            return "https://raw.githubusercontent.com/EllaKaye/interference/main/www/img/blank.png"  # You'll need to provide this
         return f"https://deckofcardsapi.com/static/img/{self.value}{self.suit}.png"
 
     def __str__(self):
         return f"{self.value}{self.suit}"
 
+class Row(list):
+    def is_stuck(self):
+        last_card_was_K = False
+        for card in self:
+            if card.value == "K":
+                last_card_was_K = True
+            elif card.value == "Blank":
+                if not last_card_was_K:
+                    return False
+            else:
+                last_card_was_K = False
+        return True
+
+    def split_index(self):
+        if self[0].value != "2":
+            return 0
+        suit = self[0].suit
+        for i in range(1, len(self)):
+            if self[i].suit != suit or self[i].value_int != i:
+                return i
+        return len(self) - 1
+
+    def split(self, index):
+        return self[:index], self[index:]
+
+    def fill_row(self, deck):
+        while len(self) < 13:
+            self.append(deck.pop())
+        return self
+
+    def is_ordered(self):
+        return self.split_index() == 12
+
 class Deck:
     def __init__(self):
-        self.cards = [
-            Card(suit, value)
-            for suit in CARD_SUITS
-            for value in CARD_VALUES
-        ]
+        self.cards = [Card(suit, value) for suit in CARD_SUITS for value in CARD_VALUES]
 
     def shuffle(self):
         random.shuffle(self.cards)
 
-    def __str__(self):
-        return " ".join(str(card) for card in self.cards)
+    def pop(self):
+        return self.cards.pop()
 
-    def to_rows(self):
-        rows = Rows(self.cards)
-        return rows
-
-class Row(list):
-    def __init__(self, cards):
-        super().__init__(cards)
-
-class Rows(list):
-    def __init__(self, deck):
-        super().__init__()
-        for i in range(4):
-            self.append(Row(deck[i*13:(i+1)*13]))
-
-    def is_valid_move(self, card1, card2):
-        if card1.suit == card2.suit or card1.value == card2.value:
-            return True
-        return False
-
-    def swap_cards(self, card1, card2):
-        if not self.is_valid_move(card1, card2):
-            print(f"Invalid move: {card1.value}{card1.suit} with {card2.value}{card2.suit}")
-            return False
-
-        pos1 = pos2 = None
-        for i, row in enumerate(self):
-            for j, card in enumerate(row):
-                if card.value == card1.value and card.suit == card1.suit:
-                    pos1 = (i, j)
-                elif card.value == card2.value and card.suit == card2.suit:
-                    pos2 = (i, j)
-                if pos1 and pos2:
-                    break
-            if pos1 and pos2:
-                break
-        
-        if pos1 and pos2:
-            self[pos1[0]][pos1[1]], self[pos2[0]][pos2[1]] = self[pos2[0]][pos2[1]], self[pos1[0]][pos1[1]]
-            print(f"Swapped cards: {card1.value}{card1.suit} with {card2.value}{card2.suit}")  # Debug print
-            return True
-        print(f"Failed to swap cards: {card1.value}{card1.suit} with {card2.value}{card2.suit}")  # Debug print
-        return False
-
-# Generate the deck and create Rows object
-deck = Deck()
-deck.shuffle()
-rows = deck.to_rows()
-
-# Function to create a card element (as an individual UI element)
 def card_ui(card_id, card):
     return ui.div(
         ui.img(src=card.image_path(), class_="card-image"),
@@ -90,19 +71,9 @@ def card_ui(card_id, card):
         **{"data-card": f"{card.value}{card.suit}"}
     )
 
-# Helper function to find card position
-def find_card_position(card_positions, card):
-    for i, row in enumerate(card_positions):
-        for j, c in enumerate(row):
-            if c().value == card.value and c().suit == card.suit:
-                return i, j
-    return None, None
-
-# Define the UI layout
 app_ui = ui.page_fluid(
     ui.h2("52 Playing Cards"),
     ui.div(
-        # Create 4 rows, each containing 13 card elements
         *[ui.div(
             *[ui.output_ui(f"card_{i*13+j}") for j in range(13)],
             class_="row",
@@ -132,12 +103,12 @@ app_ui = ui.page_fluid(
     ui.tags.style("""
         .cards-container {
             display: grid;
-            grid-template-columns: repeat(13, 1fr); /* 13 cards per row */
-            gap: calc(2vw + 2px) 1px; /* Responsive gap between rows */
-            justify-items: center; /* Center cards horizontally */
+            grid-template-columns: repeat(13, 1fr);
+            gap: calc(2vw + 2px) 1px;
+            justify-items: center;
         }
         .row {
-            display: contents; /* Ensures each card in the row occupies the correct grid space */
+            display: contents;
         }
         .card {
             box-shadow: none;
@@ -146,56 +117,66 @@ app_ui = ui.page_fluid(
             cursor: pointer;
         }
         .card-image {
-            width: 120%; /* Full width of the grid cell */
-            height: auto; /* Maintain aspect ratio */
-            max-width: calc(100vw / 15);  /* Responsive card width */
+            width: 120%;
+            height: auto;
+            max-width: calc(100vw / 15);
         }
         .card.selected {
             box-shadow: 0 0 10px 5px rgba(0,0,255,0.5);
         }
         @media (max-width: 1200px) {
             .cards-container {
-                gap: calc(1.5vw + 5px) 1px; /* Slightly smaller gap for medium screens */
+                gap: calc(1.5vw + 5px) 1px;
             }
             .card-image {
-                max-width: calc(100vw / 14);  /* Slightly larger cards on medium screens */
+                max-width: calc(100vw / 14);
             }
         }
         @media (max-width: 900px) {
             .cards-container {
-                gap: calc(1vw + 5px) 1px; /* Even smaller gap for smaller screens */
+                gap: calc(1vw + 5px) 1px;
             }
             .card-image {
-                max-width: calc(100vw / 13);  /* Larger cards on smaller screens */
+                max-width: calc(100vw / 13);
             }
         }
         @media (max-width: 600px) {
             .cards-container {
-                gap: calc(0.5vw + 5px) 1px; /* Smallest gap for mobile screens */
+                gap: calc(0.5vw + 5px) 1px;
             }
             .card-image {
-                max-width: calc(100vw / 12);  /* Largest cards on mobile screens */
+                max-width: calc(100vw / 12);
             }
         }
     """)
 )
 
-# Define the server logic
 def server(input, output, session):
-    # Create a reactive value for each card position
+    deck = Deck()
+    deck.shuffle()
+    
+    rows = [Row().fill_row(deck) for _ in range(4)]
     card_positions = [[reactive.Value(card) for card in row] for row in rows]
 
-    # Create a render function for each card
     def create_card_render(i, j):
         @output(id=f"card_{i*13+j}")
         @render.ui
         def _():
             return card_ui(f"card_{i*13+j}", card_positions[i][j]())
 
-    # Initialize all card outputs
     for i in range(4):
         for j in range(13):
             create_card_render(i, j)
+
+    def is_valid_move(card1, card2):
+        return card1.suit == card2.suit or card1.value == card2.value
+
+    def find_card_position(card):
+        for i, row in enumerate(card_positions):
+            for j, c in enumerate(row):
+                if c().value == card.value and c().suit == card.suit:
+                    return i, j
+        return None, None
 
     @reactive.Effect
     @reactive.event(input.swap_cards)
@@ -209,17 +190,19 @@ def server(input, output, session):
         card1 = Card(card1_str[1], card1_str[0])
         card2 = Card(card2_str[1], card2_str[0])
 
-        # Find positions of cards
-        pos1 = find_card_position(card_positions, card1)
-        pos2 = find_card_position(card_positions, card2)
+        if is_valid_move(card1, card2):
+            pos1 = find_card_position(card1)
+            pos2 = find_card_position(card2)
 
-        if pos1[0] is not None and pos2[0] is not None:
-            # Check if the move is valid
-            if card1.suit == card2.suit or card1.value == card2.value:
-                # Swap the cards in the reactive values
-                temp = card_positions[pos1[0]][pos1[1]]()
-                card_positions[pos1[0]][pos1[1]].set(card_positions[pos2[0]][pos2[1]]())
-                card_positions[pos2[0]][pos2[1]].set(temp)
+            if pos1[0] is not None and pos2[0] is not None:
+                # Swap the cards in both card_positions and rows
+                card_positions[pos1[0]][pos1[1]].set(card2)
+                card_positions[pos2[0]][pos2[1]].set(card1)
+                rows[pos1[0]][pos1[1]], rows[pos2[0]][pos2[1]] = rows[pos2[0]][pos2[1]], rows[pos1[0]][pos1[1]]
 
-# Create the Shiny app
+                # You can add game logic here using the rows, e.g.:
+                # for row in rows:
+                #     if row.is_ordered():
+                #         print("A row is fully ordered!")
+
 app = App(app_ui, server)
