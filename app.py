@@ -1,4 +1,5 @@
 from shiny import App, render, ui, reactive
+import random
 
 # Card constants
 CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "0", "J", "Q", "K", "A"]
@@ -15,18 +16,70 @@ class Card:
     def image_path(self):
         return f"https://deckofcardsapi.com/static/img/{self.value}{self.suit}.png"
 
-# Define Row and Rows classes for game logic
-class Row:
-    def __init__(self, cards):
-        self.cards = cards
+    def __str__(self):
+        return f"{self.value}{self.suit}"
 
-class Rows:
+class Deck:
+    def __init__(self):
+        self.cards = [
+            Card(suit, value)
+            for suit in CARD_SUITS
+            for value in CARD_VALUES
+        ]
+
+    def shuffle(self):
+        random.shuffle(self.cards)
+
+    def __str__(self):
+        return " ".join(str(card) for card in self.cards)
+
+    def to_rows(self):
+        rows = Rows(self.cards)
+        return rows
+
+class Row(list):
+    def __init__(self, cards):
+        super().__init__(cards)
+
+class Rows(list):
     def __init__(self, deck):
-        self.rows = [Row(deck[i:i+13]) for i in range(0, 52, 13)]
+        super().__init__()
+        for i in range(4):
+            self.append(Row(deck[i*13:(i+1)*13]))
+
+    def is_valid_move(self, card1, card2):
+        if card1.suit == card2.suit or card1.value == card2.value:
+            return True
+        return False
+
+    def swap_cards(self, card1, card2):
+        if not self.is_valid_move(card1, card2):
+            print(f"Invalid move: {card1.value}{card1.suit} with {card2.value}{card2.suit}")
+            return False
+
+        pos1 = pos2 = None
+        for i, row in enumerate(self):
+            for j, card in enumerate(row):
+                if card.value == card1.value and card.suit == card1.suit:
+                    pos1 = (i, j)
+                elif card.value == card2.value and card.suit == card2.suit:
+                    pos2 = (i, j)
+                if pos1 and pos2:
+                    break
+            if pos1 and pos2:
+                break
+        
+        if pos1 and pos2:
+            self[pos1[0]][pos1[1]], self[pos2[0]][pos2[1]] = self[pos2[0]][pos2[1]], self[pos1[0]][pos1[1]]
+            print(f"Swapped cards: {card1.value}{card1.suit} with {card2.value}{card2.suit}")  # Debug print
+            return True
+        print(f"Failed to swap cards: {card1.value}{card1.suit} with {card2.value}{card2.suit}")  # Debug print
+        return False
 
 # Generate the deck and create Rows object
-deck = [Card(suit, value) for suit in CARD_SUITS for value in CARD_VALUES]
-rows = Rows(deck)
+deck = Deck()
+deck.shuffle()
+rows = deck.to_rows()
 
 # Function to create a card element (as an individual UI element)
 def card_ui(card_id, card):
@@ -42,9 +95,9 @@ app_ui = ui.page_fluid(
     ui.div(
         # Create 4 rows, each containing 13 card elements
         *[ui.div(
-            *[card_ui(f"card_{i*13+j}", card) for j, card in enumerate(row.cards)],
+            *[card_ui(f"card_{i*13+j}", card) for j, card in enumerate(row)],
             class_="row",
-        ) for i, row in enumerate(rows.rows)],
+        ) for i, row in enumerate(rows)],
         class_="cards-container"
     ),
     ui.tags.style("""
