@@ -2,7 +2,7 @@ from shiny import App, render, ui, reactive
 import random
 
 # Card constants
-CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "0", "J", "Q", "K", "Blank"]
+CARD_VALUES = ["2", "3", "4", "5", "6", "7", "8", "9", "0", "J", "Q", "K", "B"]
 CARD_SUITS = ["S", "H", "D", "C"]
 VALUES_INT = {value: index for index, value in enumerate(CARD_VALUES)}
 
@@ -13,7 +13,7 @@ class Card:
         self.value_int = VALUES_INT[value]
 
     def image_path(self):
-        if self.value == "Blank":
+        if self.value == "B":
             return "https://raw.githubusercontent.com/EllaKaye/interference/main/www/img/blank.png"  # You'll need to provide this
         return f"https://deckofcardsapi.com/static/img/{self.value}{self.suit}.png"
 
@@ -26,7 +26,7 @@ class Row(list):
         for card in self:
             if card.value == "K":
                 last_card_was_K = True
-            elif card.value == "Blank":
+            elif card.value == "B":
                 if not last_card_was_K:
                     return False
             else:
