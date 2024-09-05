@@ -86,19 +86,49 @@ def card_ui(card_id, card):
     return ui.div(
         ui.img(src=card.image_path(), class_="card-image"),
         class_="card",
-        id=card_id
+        id=card_id,
+        **{"data-card": f"{card.value}{card.suit}"}
     )
 
+# Helper function to find card position
+def find_card_position(rows, card):
+    for i, row in enumerate(rows):
+        for j, c in enumerate(row):
+            if c.value == card.value and c.suit == card.suit:
+                return i, j
+    return None, None
+
+# Define the UI layout
 app_ui = ui.page_fluid(
     ui.h2("52 Playing Cards"),
     ui.div(
         # Create 4 rows, each containing 13 card elements
         *[ui.div(
-            *[card_ui(f"card_{i*13+j}", card) for j, card in enumerate(row)],
+            *[ui.output_ui(f"card_{i*13+j}") for j in range(13)],
             class_="row",
-        ) for i, row in enumerate(rows)],
+        ) for i in range(4)],
         class_="cards-container"
     ),
+    ui.tags.script("""
+        let selectedCard = null;
+
+        $(document).on('click', '.card', function() {
+            if (selectedCard === null) {
+                selectedCard = this;
+                $(this).addClass('selected');
+            } else {
+                let card1 = selectedCard.getAttribute('data-card');
+                let card2 = this.getAttribute('data-card');
+                
+                if (card1 !== card2) {
+                    Shiny.setInputValue('swap_cards', {card1: card1, card2: card2});
+                }
+                
+                $(selectedCard).removeClass('selected');
+                selectedCard = null;
+            }
+        });
+    """),
     ui.tags.style("""
         .cards-container {
             display: grid;
@@ -113,11 +143,15 @@ app_ui = ui.page_fluid(
             box-shadow: none;
             border: none;
             margin: 0;
+            cursor: pointer;
         }
         .card-image {
             width: 120%; /* Full width of the grid cell */
             height: auto; /* Maintain aspect ratio */
             max-width: calc(100vw / 15);  /* Responsive card width */
+        }
+        .card.selected {
+            box-shadow: 0 0 10px 5px rgba(0,0,255,0.5);
         }
         @media (max-width: 1200px) {
             .cards-container {
@@ -148,7 +182,44 @@ app_ui = ui.page_fluid(
 
 # Define the server logic
 def server(input, output, session):
-    pass
+    grid = reactive.Value(rows)
+
+    # Create a render function for each card
+    def create_card_render(i, j):
+        @output(id=f"card_{i*13+j}")
+        @render.ui
+        def _():
+            return card_ui(f"card_{i*13+j}", grid.get()[i][j])
+
+    # Initialize all card outputs
+    for i in range(4):
+        for j in range(13):
+            create_card_render(i, j)
+
+    @reactive.Effect
+    @reactive.event(input.swap_cards)
+    def _():
+        if input.swap_cards() is None:
+            return
+
+        card1_str = input.swap_cards()['card1']
+        card2_str = input.swap_cards()['card2']
+
+        card1 = Card(card1_str[1], card1_str[0])
+        card2 = Card(card2_str[1], card2_str[0])
+
+        current_grid = grid.get()
+        if current_grid.swap_cards(card1, card2):
+            grid.set(current_grid)
+
+            # Find positions of swapped cards
+            pos1 = find_card_position(current_grid, card1)
+            pos2 = find_card_position(current_grid, card2)
+
+            # Trigger updates for the swapped cards
+            if pos1[0] is not None and pos2[0] is not None:
+                output.invalidate(f"card_{pos1[0]*13+pos1[1]}")
+                output.invalidate(f"card_{pos2[0]*13+pos2[1]}")
 
 # Create the Shiny app
 app = App(app_ui, server)
