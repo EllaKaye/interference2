@@ -168,15 +168,30 @@ def server(input, output, session):
         for j in range(13):
             create_card_render(i, j)
 
-    def is_valid_move(card1, card2):
-        return card1.suit == card2.suit or card1.value == card2.value
-
-    def find_card_position(card):
+    def get_card_indices(card):
         for i, row in enumerate(card_positions):
             for j, c in enumerate(row):
-                if c().value == card.value and c().suit == card.suit:
+                if c().suit == card.suit and c().value == card.value:
                     return i, j
-        return None, None
+        return -1, -1
+
+    def get_test_card(card):
+        card_row, card_index = get_card_indices(card)
+        if card_row == -1 or card_index == -1 or card_index == 0:
+            return None
+        return card_positions[card_row][card_index - 1]()
+
+    def is_valid_move(card1, card2):
+        test_card = get_test_card(card2)
+
+        if not test_card and card1.value == "2":
+            return True
+        elif not test_card:
+            return False
+        elif card1.suit == test_card.suit and card1.value_int == (test_card.value_int + 1):
+            return True
+        else:
+            return False
 
     @reactive.Effect
     @reactive.event(input.swap_cards)
@@ -191,18 +206,13 @@ def server(input, output, session):
         card2 = Card(card2_str[1], card2_str[0])
 
         if is_valid_move(card1, card2):
-            pos1 = find_card_position(card1)
-            pos2 = find_card_position(card2)
+            pos1 = get_card_indices(card1)
+            pos2 = get_card_indices(card2)
 
-            if pos1[0] is not None and pos2[0] is not None:
+            if pos1[0] != -1 and pos2[0] != -1:
                 # Swap the cards in both card_positions and rows
                 card_positions[pos1[0]][pos1[1]].set(card2)
                 card_positions[pos2[0]][pos2[1]].set(card1)
                 rows[pos1[0]][pos1[1]], rows[pos2[0]][pos2[1]] = rows[pos2[0]][pos2[1]], rows[pos1[0]][pos1[1]]
-
-                # You can add game logic here using the rows, e.g.:
-                # for row in rows:
-                #     if row.is_ordered():
-                #         print("A row is fully ordered!")
 
 app = App(app_ui, server)
